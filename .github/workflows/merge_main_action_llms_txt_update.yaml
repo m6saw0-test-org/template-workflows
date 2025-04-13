@@ -1,0 +1,66 @@
+name: Post Merge Diff to Issue
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  post-diff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # 直前のコミットとの差分を取得するため
+
+      - name: Get commit diff
+        id: diff
+        run: |
+          echo "## Merge Diff" > diff.md
+          git log -2 --pretty=format:"### %h - %s (%an)" >> diff.md
+          echo "" >> diff.md
+          echo '```diff' >> diff.md
+          git diff HEAD^ HEAD >> diff.md
+          echo '```' >> diff.md
+
+      - name: install libraries
+        run: |
+          npm install dotenv axios @langchain/core @langchain/openai
+
+      - name: Push new LLMs.txt
+        uses: actions/github-script@v6
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MODEL_NAME: ${{ secrets.MODEL_NAME }}
+          PUSH_REPOSITORY: ${{ secrets.PUSH_REPOSITORY }}
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Use require to import from the JS file
+            const { main } = require('./.github/workflows/create_and_update_repository_info.js');
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            const pushRepository = process.env.PUSH_REPOSITORY;
+            const baseBranch = 'main';
+            const diff = fs.readFileSync('diff.md', 'utf8');
+            console.log("repoOwner: ", repoOwner);
+            console.log("repoName: ", repoName);
+            console.log("pushRepository: ", pushRepository);
+            console.log("baseBranch: ", baseBranch);
+            console.log("diff: ", diff);
+            
+            await main(
+              repoOwner,
+              repoName,
+              `https://github.com/${repoOwner}/${repoName}`,
+              pushRepository,
+              baseBranch,
+              diff,
+              process.env.OPENAI_API_KEY,
+              process.env.MODEL_NAME
+            );
