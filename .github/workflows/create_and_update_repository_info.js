@@ -228,6 +228,9 @@ async function pushLLMsTxt(organization, repository, repository_url, push_reposi
         let file_contents = "";
         for (const match of Array.from(modify_file_match)) {
             const new_file = match[2];
+            if (new_file.startsWith(".github")) {
+                continue;
+            }
             const file_content = await getFileContent(organization, repository, new_file);
             if (file_content) {
                 const file_content_str = await encodingFileContent(file_content);
